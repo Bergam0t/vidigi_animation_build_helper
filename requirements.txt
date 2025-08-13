@@ -1,0 +1,5 @@
+streamlit==1.48.0
+vidigi==1.0.0
+simpy==4.1.1
+pandas==2.3.1
+numpy==1.26.2
