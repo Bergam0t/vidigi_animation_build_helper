@@ -6,12 +6,19 @@ st.set_page_config(layout="wide")
 
 st.title("Streamlit Animation Builder Helper")
 
+animation_code = ""
+
 use_sample_dataset = st.toggle("Use sample dataset")
 if use_sample_dataset:
     event_logs = "sample_event_logs.csv"
 else:
     event_logs = st.file_uploader("Click to upload your event logs", ".csv")
-    print(event_logs)
+    # print(event_logs)
+
+animation_code += f"""
+event_log_df = pd.read_csv("{event_logs}")
+"""
+
 
 st.info("""
         Your event logs must follow the format that vidigi expects. For help with this, you can consult the documentation.
@@ -42,13 +49,29 @@ if event_logs:
     event_col_name_options = list(dict.fromkeys(event_col_name_options))
     event_col_name = col_event.selectbox("Select the event column", event_col_name_options)
 
-    contains_resources = st.toggle("Does your model contain resources?", value=False)
+    col_resource, col_runs = st.columns(2)
+
+    contains_resources = col_resource.toggle("Does your model contain resources?", value=False)
 
     if contains_resources:
         resource_col_name_options = ["resource_id"]
         resource_col_name_options.extend(event_logs_df.columns)
         resource_col_name_options = list(dict.fromkeys(resource_col_name_options))
-        resource_col_name = st.selectbox("Select the resource identifier column", resource_col_name_options)
+        resource_col_name = col_resource.selectbox("Select the resource identifier column", resource_col_name_options)
+
+    contains_multiple_runs = col_runs.toggle("Does your event log contain data from more than one model run?", value=False)
+
+    if contains_multiple_runs:
+        run_col_name_options = ["run_number"]
+        run_col_name_options.extend(event_logs_df.columns)
+        run_col_name_options = list(dict.fromkeys(run_col_name_options))
+        run_col_name = col_runs.selectbox("Select the run identifier column", run_col_name_options)
+
+        chosen_run = col_runs.selectbox("Select the run you want to animate", options=event_logs_df[run_col_name].unique())
+
+        animation_code += f"""
+event_log_df = event_log_df[event_log_df[{run_col_name}] == {chosen_run}] # CHANGE THIS VALUE IF YOU WANT TO VISUALISE A RUN OTHER THAN RUN '1'
+"""
 
 
     # col1, col2, col3 = st.columns(3)
@@ -82,7 +105,7 @@ if event_logs:
     @st.fragment
     def build_event_position_df_start(event_log_df):
         event_position_df = event_log_df[["event_type", "event"]].drop_duplicates().sort_values(["event_type", "event"])
-        event_position_df = event_position_df[event_position_df["event_type"] != "resource_use_end"].reset_index(drop=True)
+        event_position_df = event_position_df[event_position_df["event_type"].isin(["arrival_departure", "queue", "resource_use_end"])].reset_index(drop=True)
         event_position_df["x"] = 0
         event_position_df["y"] = 0
         return event_position_df
@@ -106,6 +129,7 @@ if event_logs:
 """
 from vidigi.animation import animate_activity_log
 from vidigi.utils import EventPosition, create_event_position_df
+import pandas as pd
     """, language='python', line_numbers=True)
 
     col_event_position_df.subheader("Event Positioning Dataframe")
@@ -117,7 +141,5 @@ print("Hello World")
 
     st.subheader("Animation Code")
     st.code(
-"""
-print("Hello World")
-"""
+animation_code
     )
